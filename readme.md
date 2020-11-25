@@ -2,7 +2,7 @@
 
 生成的img文件位于[release](https://github.com/MashPlant/rpi-image-locating/releases/download/initial/sdcard.img.zip)中，下载并解压后可以直接刷入Raspberry Pi 3 Model B+中。
 
-以下介绍生成img文件的过程和使用方法。
+以下介绍生成img文件的过程和使用方法。报告在report文件夹下，它大致描述了这些修改是怎么得到的。
 
 # 构建程序
 
