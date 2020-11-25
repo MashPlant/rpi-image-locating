@@ -1,0 +1,5 @@
+ifconfig wlan0 up
+sleep 1
+iw dev wlan0 connect "test"
+udhcpc -i wlan0
+/root/a.out
