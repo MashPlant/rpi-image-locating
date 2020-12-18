@@ -38,20 +38,13 @@ $ make install -j16
 
 ## 编译程序
 
-为了运行`gen_data.cpp`，本机也需要安装OpenCV，用你习惯的包管理器安装就可以。还需要将一张待识别的1920 * 1080的图片`1.jpg`放到和`gen_data.cpp`同一目录下，然后执行：
-
-```bash
-$ g++ gen_data.cpp `pkg-config --libs opencv` -lpthread -O3
-$ ./a.out > data.cpp
-```
-
-这样生成的`data.cpp`中包含一个全局数组定义，`main.cpp`中使用了这个数组。编译`main.cpp`：
+编译`main.cpp`：
 
 ```bash
 $ arm-linux-musleabihf-g++ main.cpp -I<opencv path>/install/include/opencv4/ -L<opencv path>/install/lib -lopencv_videoio -lopencv_imgcodecs -lopencv_imgproc -lopencv_core -L<opencv path>/install/lib/opencv4/3rdparty -littnotify -llibjpeg-turbo -llibopenjp2 -llibpng -llibtiff -llibwebp -lzlib -ldl -lpthread -O3 -static -fno-exceptions -fno-rtti -flto -s data.cpp
 ```
 
-这样就生成了一个静态编译的程序`a.out`，在我的环境中它的大小约为2.5MiB，它将完成包括图像录制，位置识别，响应网络请求在内的所有工作，并且不依赖任何动态链接库。在最终的系统中只需要联网后运行这个程序即可。
+这样就生成了一个静态编译的程序`a.out`，在我的环境中它的大小约为2.4MiB，它将完成包括图像录制，位置识别，响应网络请求在内的所有工作，并且不依赖任何动态链接库。在最终的系统中只需要联网后运行这个程序即可。
 
 # 构建系统
 
@@ -72,4 +65,11 @@ $ make BR2_EXTERNAL=<path to buildroot_raspberry> O=$PWD -C ../buildroot/ raspbe
 
 树莓派连上Wi-Fi后有很多种方法可以查找它的IP地址，比较简单的一种是在(Android)手机上安装一个命令行模拟器，在其中执行`ip neigh`即可查看连接本手机热点的设备IP。
 
-电脑同样连上这个Wi-Fi，将`index.html`中的`let server = "http://0.0.0.0:";`改成`let server = "http://<树莓派 IP>:";`，然后在浏览器中打开`index.html`即可。经测试Windows设备打开`index.html`会有相当程度的卡顿和延迟，我不清楚具体原因，可能和防火墙有关，建议使用Linux设备打开。
+电脑同样连上这个Wi-Fi，将`index.html`中的`let server = "http://0.0.0.0:";`改成`let server = "http://<树莓派IP>:";`，然后在浏览器中打开`index.html`即可。经测试Windows设备打开`index.html`会有相当程度的卡顿和延迟，我不清楚具体原因，可能和防火墙有关，建议使用Linux设备打开。
+
+识别程序和文件系统中都不包括待识别的图片，运行时通过`gen_data.cpp`向树莓派发送待识别的图片。为了编译运行`gen_data.cpp`，本机也需要安装OpenCV，用你习惯的包管理器安装就可以。还需要将一张待识别的1920 * 1080的图片然后执行：
+
+```bash
+$ g++ gen_data.cpp `pkg-config --libs opencv` -lpthread -O3 -o gen_data
+$ ./gen_data <图片路径> <树莓派IP>
+```

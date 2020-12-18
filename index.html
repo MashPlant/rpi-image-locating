@@ -39,7 +39,6 @@
       <canvas id="rect" class="coveringCanvas"></canvas>
     </div>
   </div>
-  <select id="select"></select>
   <p id="fps">0.0FPS</p>
 </body>
 
@@ -48,19 +47,6 @@
   let video = document.getElementById("video");
   video.src = server + "8080/cam.mjpg";
   let match = document.getElementById("match");
-
-  let select = document.getElementById("select");
-  for (let i = 1; i <= 10; ++i) {
-    var option = document.createElement("option");
-    option.text = `${i}.jpg`;
-    select.add(option);
-  }
-  select.onchange = () => {
-    let pic = event.target.value[0];
-    fetch(server + "8081?pic=" + pic, { method: "POST" })
-      .then(x => x.blob()).then(x => x.arrayBuffer())
-      .then(x => console.log("select picture success", x));
-  };
 
   let rect = document.getElementById("rect");
   rect.width = 960;

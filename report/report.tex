@@ -98,15 +98,9 @@ Content-length: <编码的图片的长度>\r\n
 
 因为是简单地向一个socket循环发送，所以同一时间只能服务一个客户端，这在我的应用中也足够了。
 
-8081端口可以处理两种请求，一种是GET，回复识别出的坐标；一种是POST，按照客户端的要求更换被匹配的图片。目标图片的编号在客户端用query string传递：
+8081端口可以处理两种请求，一种是GET，回复识别出的坐标；一种是POST，按照客户端的传输的信息构造待识别图片。\inline{gen\_data.cpp}中读取本地图片并发送``POST请求''，其实并不是标准的HTTP请求格式，只是开头有\inline{POST}四个字母，后面紧跟图片编码的字节数组，只要能和标准HTTP客户端发出的GET请求区分开即可。
 
-\begin{lstlisting}[language=c]
-fetch(server + "8081?pic=" + pic, { method: "POST" })
-\end{lstlisting}
-
-此时可以在socket中读到一段HTTP请求，开头内容是\inline{POST /?pic=x}，所以在我的实现中如果第11个字符是\inline{=}就认为是POST请求，然后根据第12个字符的内容更换图片。
-
-在我开发了这个功能后才知道不需要在运行时更换被匹配的图片，所以程序中只实现了读出这个字符，没有进行实际的更换图片操作。
+从套接字读取图片数据时需要注意，普通的\inline{read}调用不能保证读取了完整的数据，实际读取的数据可能少于图片大小。我选择使用\inline{recv}调用，\inline{flags}参数传\inline{MSG\_WAITALL}，这样除非读取出现错误，否则总是会读取完整的数据才返回。
 
 \section{构建应用程序}
 
@@ -257,7 +251,7 @@ endif()
   
   \item 此时程序虽然只有2.4MiB，但还依赖一个2.0MiB左右的图片。我的程序只需要图片的灰阶数据，而且用\inline{pyrDown}压缩三次，一张\inline{1920 * 1080}的图片实际用到的信息量只有\inline{(1920 / 8) * (1080 / 8) = 32400B}，远小于2.0MiB，所以可以设法把图片数据嵌入到程序中。
   
-  借助\href{https://github.com/MashPlant/rpi-image-locating/blob/master/gen_data.cpp}{gen\_data.cpp}输出\inline{cv::Mat}的相关信息：
+  借助\inline{gen\_data.cpp}输出\inline{cv::Mat}的相关信息：
   
   \begin{lstlisting}[language=c++]
 #include <opencv2/core.hpp>
@@ -292,7 +286,7 @@ p.datastart = p.data = data, p.dataend = p.datalimit = data + W * H;
 p.size.p = size, p.step.p = step;
 \end{lstlisting}
   
-  程序尺寸从2.4MiB上升到2.5MiB，但是不再需要图片，总体尺寸从4.4MiB降低到2.5MiB。
+  程序尺寸从2.4MiB上升到2.5MiB，但是不再需要图片，总体尺寸从4.4MiB降低到2.5MiB。之后改成运行时再向树莓派发送待识别的图片后，程序的尺寸仍然是2.4MiB。
 \end{enumerate}
 
 \section{构建Linux系统}
@@ -324,13 +318,13 @@ p.size.p = size, p.step.p = step;
   
   \item 新建文件夹\inline{rootfs\_overlay}，设定\inline{BR2\_ROOTFS\_OVERLAY}为这个文件夹的位置。在其中创建\inline{rootfs\_overlay/etc/init.d/S60wifi}，内容为：
   
-  \begin{lstlisting}[language=bash]
-  ifconfig wlan0 up
-  sleep 1
-  iw dev wlan0 connect "test"
-  udhcpc -i wlan0
-  # 这里可以直接执行程序：/root/a.out
-  \end{lstlisting}
+\begin{lstlisting}[language=bash]
+ifconfig wlan0 up
+sleep 1
+iw dev wlan0 connect "test"
+udhcpc -i wlan0
+# 这里可以直接执行程序：/root/a.out
+\end{lstlisting}
   
   rootfs overlay功能会将这个文件夹下的内容加入根文件系统中。原本的文件系统中的\inline{init.d/}中的\inline{rcS}会枚举这个文件夹下\inline{S}开头的文件并按顺序执行，所以创建一个这样的文件即可自动执行，\inline{60}应该可以保证它排在现存的文件之后。\inline{test}是我的手机热点的Wi-Fi名称。经实验\inline{ifconfig wlan0 up}开启\inline{wlan0}后需要等待一段时间再连接Wi-Fi和获取IP地址，否则获取IP地址时会收不到响应。我不知道具体原因，就用\inline{sleep 1}强制等待一秒。
   

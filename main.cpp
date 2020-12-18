@@ -38,15 +38,18 @@ pthread_mutex_t mu;
   });
 }
 
+const int DATA_W = 1920 / (1 << PYR_CNT), DATA_H = 1080 / (1 << PYR_CNT);
+unsigned char data[DATA_W * DATA_H];
+
 [[noreturn]] void *pos_server_fn(void *) {
   serve(8081, [](int fd) {
-    char rd[16];
+    char rd[4];
     read(fd, rd, sizeof(rd));
-    if (rd[10] == '=') { // POST /?pic=x
-      int id = rd[11] - '0';
-      stat[0] = id, stat[1] = stat[2] = 0; // for debug
+    if (memcmp(rd, "POST", 4) == 0) {
+      int n = recv(fd, data, sizeof(data), MSG_WAITALL);
+      stat[0] = n >> 16, stat[1] = n & 0xFFFF, stat[2] = 0xFFFF; // for debug
     }
-    static char buf[] = "HTTP/1.1 200 OK\r\nContent-Type: application/x-binary\r\nAccess-Control-Allow-Origin: null\r\nContent-length: 6\r\n\r\n\0\0\0\0\0\0\0\0\0";
+    static char buf[] = "HTTP/1.1 200 OK\r\nContent-Type: application/x-binary\r\nAccess-Control-Allow-Origin: null\r\nContent-length: 6\r\n\r\n\0\0\0\0\0";
     memcpy(buf + sizeof(buf) - sizeof(stat), stat, sizeof(stat));
     write(fd, buf, sizeof(buf));
   });
@@ -55,34 +58,25 @@ pthread_mutex_t mu;
 [[noreturn]] void *calc_fn(void *) {
   cv::Mat temp, result;
   while (true) {
-    long long beg = cv::getTickCount();
     pthread_mutex_lock(&mu);
     cv::cvtColor(video_pic, temp, cv::COLOR_BGR2GRAY);
     pthread_mutex_unlock(&mu);
-    long long cur1 = cv::getTickCount(), el1 = (cur1 - beg) / 1000000;
-    beg = cur1;
     for (int i = 0; i < PYR_CNT; ++i) cv::pyrDown(temp, temp);
     cv::matchTemplate(orig_pic, temp, result, cv::TM_CCORR_NORMED);
     cv::Point max_loc;
     cv::minMaxLoc(result, nullptr, nullptr, nullptr, &max_loc);
     stat[0] = max_loc.x, stat[1] = max_loc.y;
     if (stat[2]++ == 30) stat[2] = 0;
-    long long cur2 = cv::getTickCount(), el2 = (cur2 - beg) / 1000000;
-    stat[3] = el1;
-    stat[4] = el2;
   }
 }
 
 int main() {
-  {
-    const int W = 1920 / (1 << PYR_CNT), H = 1080 / (1 << PYR_CNT);
-    extern unsigned char data[W * H];
-    static int size[2] = {H, W};
-    static size_t step[2] = {W, 1};
-    orig_pic.flags = 0x42ff4000, orig_pic.dims = 2, orig_pic.rows = H, orig_pic.cols = W;
-    orig_pic.datastart = orig_pic.data = data, orig_pic.dataend = orig_pic.datalimit = data + W * H;
-    orig_pic.size.p = size, orig_pic.step.p = step;
-  }
+  static int size[2] = {DATA_H, DATA_W};
+  static size_t step[2] = {DATA_W, 1};
+  orig_pic.flags = 0x42ff4000, orig_pic.dims = 2, orig_pic.rows = DATA_H, orig_pic.cols = DATA_W;
+  orig_pic.datastart = orig_pic.data = data, orig_pic.dataend = orig_pic.datalimit = data + sizeof(data);
+  orig_pic.size.p = size, orig_pic.step.p = step;
+
   video.open(0);
   video.read(video_pic); // guarantee video_pic not empty
   cv::resize(video_pic, video_pic, cv::Size(VIDEO_W, VIDEO_H));
